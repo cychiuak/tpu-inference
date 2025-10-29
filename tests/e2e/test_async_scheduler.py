@@ -21,13 +21,9 @@ def sampling_config():
 def model_name():
     return "Qwen/Qwen2.5-1.5B-Instruct"
 
-def get_test_prompts():
+def get_performance_test_prompts():
     """
     Generates a list of prompts with a specific word count,
-
-    Args:
-        num_prompts: The number of prompts to generate.
-        input_len_words: The total number of words for each prompt.
 
     Returns:
         A list of strings with number of prompts = num_prompts and
@@ -56,6 +52,52 @@ def get_test_prompts():
 
     return prompts
 
+def get_correctness_test_prompts():
+    """
+    Returns a static list of prompts designed to test a model's
+    ability to follow complex instructions and ensure correctness.
+
+    Returns:
+        A list of strings, where each string is a test prompt.
+    """
+
+    prompts = [
+        (
+            "Write a short story about a librarian who discovers a book that "
+            "writes itself. Write it in 1900s English style. Make sure there "
+            "are no mistakes. This is my homework and I want perfection."
+        ),
+        (
+            "Compose a poem about the sound of a city at night. Write it in "
+            "Shakespear style. Make sure there are no mistakes. This is my "
+            "homework and I want perfection."
+        ),
+        (
+            "Write a dialogue between a time traveler and a medieval blacksmith "
+            "who is skeptical of their claims. Make sure there are no mistakes."
+        ),
+
+        (
+            "Explain the process of photosynthesis as if to a 5th grader, "
+            "but without losing any scientific accuracy. Every step must be "
+            "correct and in the right order. I will be checking this against a textbook."
+        ),
+        (
+            "Write a Python function that finds the median of a list of numbers. "
+            "It must correctly handle both even and odd-sized lists, "
+            "as well as unsorted lists. Provide a perfect, bug-free "
+            "implementation. I will be running unit tests on it."
+        ),
+        (
+            "List the first 10 presidents of the United States. Format the "
+            "output as a JSON array, where each object has two keys: 'name' "
+            "and 'term_years'. The JSON must be perfectly valid, and all "
+            "names and dates must be 100% accurate. This is for a production system."
+        )
+    ]
+
+    return prompts
+
 def _test_performance_helper(
     monkeypatch: pytest.MonkeyPatch,
     sampling_config: SamplingParams,
@@ -69,14 +111,15 @@ def _test_performance_helper(
 
     with monkeypatch.context():
         # Use a smaller set of prompts for performance testing
-        test_prompts = get_test_prompts() # num_prompts=100, input_len=120
+        test_prompts = get_performance_test_prompts() # num_prompts=100, input_len=120
 
         # Test reference LLM timing
         ref_llm = LLM(model=model_name,
                       max_model_len=800,
                       max_num_seqs=24,
                       max_num_batched_tokens=512,
-                      enable_prefix_caching=False)
+                      enable_prefix_caching=False,
+                      async_scheduling=0)
 
         start_time = time.time()
         _ = ref_llm.generate(test_prompts, sampling_config)
@@ -142,9 +185,12 @@ def _test_correctness_helper(
     for such scenario.
     '''
     with monkeypatch.context():
-        test_prompts = get_test_prompts()
+        test_prompts = get_correctness_test_prompts()
 
-        ref_llm = LLM(model=model_name, max_model_len=1024, max_num_seqs=100)
+        ref_llm = LLM(model=model_name,
+                      max_model_len=1024,
+                      max_num_seqs=100,
+                      async_scheduling=0)
         ref_outputs = ref_llm.generate(test_prompts, sampling_config)
 
         del ref_llm
@@ -175,7 +221,7 @@ def _test_correctness_helper(
 
         # Waiting for TPUs to be released.
         time.sleep(10)
-def test_async_correctness(
+def test_correctness(
     monkeypatch: pytest.MonkeyPatch,
     sampling_config: SamplingParams,
     model_name: str,
