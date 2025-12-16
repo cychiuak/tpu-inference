@@ -4076,7 +4076,13 @@ def get_tuned_block_sizes(
     except KeyError:
         logger.warning_once(
             'Couldn`t find tuned sizes for the RPA v3 kernel with %s', keys)
-
+    import os
+    if 'DEV_BKV_P' in os.environ:
+        bkv_p = int(os.environ['DEV_BKV_P'])
+        logger.warning_once(f"override bkv_p to {bkv_p}")
+    if 'DEV_BQ' in os.environ:
+        bq = int(os.environ['DEV_BQ'])
+        logger.warning_once(f"override bq to {bq}")
     return (min(pages_per_seq, bkv_p), min(max_num_tokens, bq))
 
 
